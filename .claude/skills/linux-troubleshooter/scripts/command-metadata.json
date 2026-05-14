@@ -1,0 +1,67 @@
+{
+  "version": "2.1.0",
+  "commands": {
+    "triage": {
+      "category": "intake",
+      "reference": "reference/triage.md"
+    },
+    "boot": {
+      "category": "system",
+      "reference": "reference/boot.md"
+    },
+    "network": {
+      "category": "connectivity",
+      "reference": "reference/network.md"
+    },
+    "packages": {
+      "category": "lifecycle",
+      "reference": "reference/packages.md"
+    },
+    "virtualization": {
+      "category": "hypervisor",
+      "reference": "reference/virtualization.md"
+    },
+    "storage": {
+      "category": "resources",
+      "reference": "reference/storage.md"
+    },
+    "performance": {
+      "category": "resources",
+      "reference": "reference/performance.md"
+    },
+    "desktop": {
+      "category": "ui",
+      "reference": "reference/desktop.md"
+    },
+    "server": {
+      "category": "services",
+      "reference": "reference/server.md"
+    },
+    "immutable": {
+      "category": "platform-model",
+      "reference": "reference/immutable.md"
+    },
+    "security": {
+      "category": "access-control",
+      "reference": "reference/security.md"
+    },
+    "containers": {
+      "category": "runtime",
+      "reference": "reference/containers.md"
+    },
+    "kernel": {
+      "category": "low-level",
+      "reference": "reference/kernel.md"
+    },
+    "logs": {
+      "category": "forensics",
+      "reference": "reference/logs.md"
+    }
+  },
+  "shared_references": [
+    "reference/evidence-checklist.md",
+    "reference/distro-matrix.md",
+    "reference/rollback-patterns.md",
+    "reference/verification-patterns.md"
+  ]
+}

@@ -46,31 +46,66 @@ When the user chooses AI-runs-approved-fixes and a command requires privilege:
 
 ## Setup (always run first)
 
-0. Establish run context before diagnostics. If the user has not already answered, ask:
+0. Establish run context before diagnostics.
 
-- **Target device**: main system/host, current sandbox/container, or another device over SSH?
-- **Execution mode**: should the AI run approved fix commands, or should it provide commands for the user to run manually?
-
-If the target is another device over SSH, ask for the SSH target string and do not run local diagnostics as if they describe the remote device. If the user chooses manual execution, gather read-only evidence when possible and present fix commands without running them.
-
-1. Run mode detection on the chosen target:
+First, automatically identify the current target when read-only local detection is available. Prefer the bundled helper from the active skill checkout:
 
 ```bash
+bash scripts/detect-mode.sh
+```
+
+If the helper is unavailable, use read-only detection commands directly:
+
+```bash
+hostname
+hostnamectl chassis 2>/dev/null || true
+hostnamectl status 2>/dev/null || true
 uname -a
 cat /etc/os-release
 systemd-detect-virt || true
 ps -p 1 -o comm=
 ```
 
+Use the detection output to infer whether the current execution context is a host, desktop, server, mixed-use workstation, immutable system, container, VM, or hypervisor-capable system. Treat `hostnamectl` chassis/deployment, `/etc/os-release`, PID 1, virtualization/container detection, display-manager/session signals, service signals, package-manager availability, container-runtime availability, and virtualization tooling as evidence. Interpret `hostnamectl chassis` values such as `laptop`, `desktop`, `convertible`, `tablet`, or `handset` as desktop-class evidence, and `server` as server-class evidence unless stronger contrary evidence exists.
+
+Before asking the first prompt, show a short detected profile that includes at least: target hostname, chassis, deployment when known, OS/family, model, role, init, virtualization/container context, and recommended commands. If `chassis=unknown`, state that chassis was unavailable instead of omitting it.
+
+After detection, ask only for unresolved context. If detection clearly shows the active troubleshooting target and the user did not ask for SSH or another machine, use the detected local target without asking the target-device question. Ask the target-device question only when:
+
+- the user explicitly mentions another device, remote host, SSH, production host, VM guest, or host system outside the current sandbox/container;
+- detection shows a sandbox/container but the symptom sounds like host hardware, boot, kernel, desktop session, disk partitioning, or another host-level issue;
+- the target is ambiguous enough that local diagnostics could describe the wrong machine.
+
+Always establish execution mode before applying fixes. If the user has not already answered, ask:
+
+- **Execution mode**: should the AI run approved fix commands, or should it provide commands for the user to run manually?
+
+Use selectable UI prompts for these required choices whenever the active harness provides them, so the user can choose with arrow keys instead of typing. If a selectable prompt supports only a few choices, ask in stages rather than falling back to free-text input:
+
+- Target device, only when unresolved: detected local target, main system/host, current sandbox/container, or SSH remote.
+- Execution mode: AI runs approved fix commands, or user runs commands manually.
+
+If the target is another device over SSH, ask for the SSH target string and do not run local diagnostics as if they describe the remote device. If the user chooses manual execution, gather read-only evidence when possible and present fix commands without running them.
+
+1. Run mode detection on the chosen target. If the helper was not already run in step 0, run it now:
+
+```bash
+bash scripts/detect-mode.sh
+```
+
+If the helper is unavailable, run the fallback commands from step 0.
+
 2. Classify:
 
 - **Family**: Debian/Ubuntu, Fedora/RHEL, Arch, openSUSE, Alpine, NixOS, other
 - **Model**: mutable or immutable
+- **Chassis**: `hostnamectl chassis` value when available, otherwise unknown
 - **Role**: desktop, server, mixed
 - **Init**: systemd or alternative
 - **Container context**: host, container, nested container
 - **Target**: local host, current sandbox/container, or SSH remote
 - **Execution mode**: AI-runs-approved-fixes or user-runs-fixes
+- **Recommended commands**: filtered troubleshooting commands derived from the classification
 
 3. Load prior incident context from `${LINUX_TROUBLESHOOTER_DOCS_DIR:-$HOME/docs}` when available.
 
@@ -99,7 +134,31 @@ Summarize any relevant prior findings, fixes, rollback notes, and verification r
 
 ## Command menu
 
-If no argument is provided, first ask the run-context questions from Setup step 0, then show this table and ask what to run.
+If no argument is provided, first run the detection and run-context flow from Setup step 0, then build a filtered troubleshooting menu from the detected system profile. Do not show every command by default. Present only commands that fit the selected target, plus `triage` and `logs` as universal fallbacks. Do not require the user to type a command name when a selection control can be used.
+
+Use these filtering rules unless the helper already produced a `recommended_commands` list:
+
+- Always include: `triage`, `logs`, `network`, `storage`, `performance`, `security`.
+- Include `packages` when a package manager or immutable deployment tool exists.
+- Include `boot` and `kernel` only for host/VM targets, not ordinary containers.
+- Include `desktop` only when display/session/display-manager evidence exists, or the role is desktop/mixed.
+- Include `server` when server services, SSH, service-manager use, or headless/server role evidence exists.
+- Include `immutable` only for rpm-ostree, ostree-booted, transactional-update, NixOS, or snapshot/declarative systems.
+- Include `containers` when the target is a container or has Podman, Docker, containerd, Distrobox, or cgroup/container namespace symptoms.
+- Include `virtualization` only when the target is not an ordinary container and KVM/libvirt/QEMU/VirtualBox/VMware/nested-virt evidence exists, or the symptom explicitly concerns VMs.
+
+If a user enters a command directly, honor it even if it was filtered out of the menu, then note why it was not part of the recommended menu. If the symptom strongly implies a filtered-out command, add that command back for this run.
+
+For selectable prompts with small choice limits, use staged selection:
+
+1. Choose a group, but include only groups that contain at least one recommended command:
+   - Intake and logs: `triage`, `logs`, `security`
+   - System and platform: `boot`, `packages`, `immutable`, `kernel`, `virtualization`
+   - Operations and runtime: `network`, `storage`, `performance`, `desktop`, `server`, `containers`
+2. Choose the command inside the selected group after removing commands not recommended for the detected target. If the group has more choices than the UI supports, split it into short pages and include a "more" choice.
+3. Ask for an optional symptom as free text only after the command is selected. Allow the user to skip it.
+
+When selectable prompts are unavailable, show a filtered table using the detected profile and accept either a command name, a number, or a full symptom. If the input is a number, map it to the filtered table order. Use the full table below only as the command catalog and as the fallback if detection cannot run.
 
 | Command | Focus | Typical checks |
 |---|---|---|
@@ -158,7 +217,7 @@ For each troubleshooting run, provide:
 5. **Verification**: commands and expected healthy signals
 6. **Incident doc**: create or update a concise Markdown report under `${LINUX_TROUBLESHOOTER_DOCS_DIR:-$HOME/docs}` before the final response
 
-Also state the selected **target device** and **execution mode** in the final response and incident doc. For fix commands, distinguish commands already run by the AI from commands the user still needs to run manually.
+Also state the selected **target device**, detected **chassis**, and **execution mode** in the final response and incident doc. For fix commands, distinguish commands already run by the AI from commands the user still needs to run manually.
 
 Use the bundled helper from the active skill checkout when available:
 

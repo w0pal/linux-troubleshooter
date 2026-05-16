@@ -1,0 +1,4 @@
+interface:
+  display_name: "Linux Troubleshooter"
+  short_description: "Diagnose Linux boot, network, package, and service issues"
+  default_prompt: "Use $linux-troubleshooter to triage a Linux issue with evidence-first diagnostics and reversible fixes."

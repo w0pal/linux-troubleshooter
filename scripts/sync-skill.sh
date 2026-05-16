@@ -11,10 +11,17 @@ TARGETS=(
   "$ROOT/.codex/skills/linux-troubleshooter"
 )
 
+synced=0
+
 for target in "${TARGETS[@]}"; do
+  if [[ -e "$target" && ! -w "$target" ]]; then
+    echo "Skipping read-only target: $target" >&2
+    continue
+  fi
   rm -rf "$target"
   mkdir -p "$(dirname "$target")"
   cp -a "$SRC" "$target"
+  synced=$((synced + 1))
 done
 
-echo "Synced skill to ${#TARGETS[@]} harness targets."
+echo "Synced skill to $synced harness targets."

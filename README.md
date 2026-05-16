@@ -45,3 +45,23 @@ Edit `skill/` first, then sync to harness folders:
 ```bash
 bash scripts/sync-skill.sh
 ```
+
+## Installed skill hardening
+
+GitHub protects the remote source of truth, but it does not protect an already installed local copy under `~/.codex/skills/`. To make the installed `linux-troubleshooter` skill read-only to normal chat/workspace edits, lock the local install after syncing:
+
+```bash
+sudo chown -R root:root ~/.codex/skills/linux-troubleshooter
+sudo chmod -R a-w ~/.codex/skills/linux-troubleshooter
+sudo chattr -R +i ~/.codex/skills/linux-troubleshooter
+```
+
+To update the installed copy later, unlock it locally, sync or reinstall from GitHub, then lock it again:
+
+```bash
+sudo chattr -R -i ~/.codex/skills/linux-troubleshooter
+sudo chown -R "$USER:$USER" ~/.codex/skills/linux-troubleshooter
+sudo chmod -R u+w ~/.codex/skills/linux-troubleshooter
+```
+
+Do not paste GitHub tokens, passwords, PINs, recovery keys, or sudo passwords into chat. Use local `sudo` prompts or `gh auth login` when authentication is needed.

@@ -1,7 +1,7 @@
 ---
 name: linux-troubleshooter
 description: Use when troubleshooting Linux issues across distro families and deployment models, including mutable and immutable systems, desktop and server environments.
-version: 2.1.0
+version: 2.2.2
 user-invocable: true
 argument-hint: "[triage|boot|network|packages|virtualization|storage|performance|desktop|server|immutable|security|containers|kernel|logs] [symptom]"
 license: Apache-2.0
@@ -32,6 +32,17 @@ Use this skill for:
 5. For production servers, prioritize minimal-impact mitigation first.
 6. Before applying any fix command, confirm whether the user wants the AI to run it or wants to run it themselves.
 7. When unsure, stop and ask one focused question before risky changes.
+8. Never ask the user to paste passwords, PINs, recovery keys, tokens, or other secrets into chat. If a privileged command needs authentication and the execution harness supports an interactive terminal, run it with a TTY so sudo/polkit/SSH can read the secret locally from the prompt. If the user accidentally pastes a secret into chat, do not repeat it, store it, or use it; tell the user to enter secrets only in the local prompt.
+
+## Authentication for privileged commands
+
+When the user chooses AI-runs-approved-fixes and a command requires privilege:
+
+- Prefer the harness/tool option that allocates an interactive TTY, so `sudo`, fingerprint, polkit, or SSH password prompts are handled outside chat.
+- Do not use `sudo -S`, askpass wrappers, environment variables, shell history, temporary files, or chat-provided secrets to pass passwords.
+- If authentication times out or the user interrupts it, check for partially completed work before retrying.
+- If TTY authentication is unavailable or repeatedly fails, switch to user-runs-fixes mode for that command and provide the exact command for the user to run manually.
+- After an interrupted privileged operation, verify the system state before continuing, especially for operations that can leave services stopped or devices inactive.
 
 ## Setup (always run first)
 
@@ -61,14 +72,30 @@ ps -p 1 -o comm=
 - **Target**: local host, current sandbox/container, or SSH remote
 - **Execution mode**: AI-runs-approved-fixes or user-runs-fixes
 
-3. Load these shared references before focused troubleshooting:
+3. Load prior incident context from `${LINUX_TROUBLESHOOTER_DOCS_DIR:-$HOME/docs}` when available.
+
+Use prior docs as context, not as proof. Prefer recent and topic-relevant Markdown files, especially incident reports created by this skill. Keep this selective:
+
+```bash
+find "${LINUX_TROUBLESHOOTER_DOCS_DIR:-$HOME/docs}" -maxdepth 1 -type f -name '*.md' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -20
+```
+
+Then search/read only likely relevant files, using filenames, headings, and keywords from the current symptom, service names, device names, package names, and error text. For example:
+
+```bash
+rg -n -i 'keyword|service|device|error' "${LINUX_TROUBLESHOOTER_DOCS_DIR:-$HOME/docs}" 2>/dev/null
+```
+
+Summarize any relevant prior findings, fixes, rollback notes, and verification results before deciding on a new fix. Do not bulk-load unrelated notes or treat stale docs as current system state.
+
+4. Load these shared references before focused troubleshooting:
 
 - [reference/evidence-checklist.md](reference/evidence-checklist.md)
 - [reference/distro-matrix.md](reference/distro-matrix.md)
 - [reference/rollback-patterns.md](reference/rollback-patterns.md)
 - [reference/verification-patterns.md](reference/verification-patterns.md)
 
-4. If first token matches a command, load its reference file and follow it.
+5. If first token matches a command, load its reference file and follow it.
 
 ## Command menu
 
